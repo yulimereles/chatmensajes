@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
+    <style>
+      body {
+        margin: 0;
+        padding-bottom: 3rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        background-color: #000000;
+      }
+
+      #form {
+        background: rgba(0, 0, 0, 0.15);
+        padding: 0.25rem;
+        /* position: fixed; */
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        height: 3rem;
+        box-sizing: border-box;
+        backdrop-filter: blur(10px);
+      }
+      #input {
+        border: none;
+        padding: 0 1rem;
+        flex-grow: 1;
+        border-radius: 2rem;
+        margin: 0.25rem;
+      }
+      #input:focus {
+        outline: none;
+      }
+      #form > button {
+        background: #af2c6e;
+        border: none;
+        padding: 0 5rem;
+        margin: 0.25rem;
+        border-radius: 3px;
+        outline: none;
+        color: #fff;
+      }
+      .message {
+        margin-left: 20px; /* Ajusta este valor según tus preferencias */
+      }
+
+      #messages {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+      }
+      #messages > li {
+        padding: 0.5rem 1rem;
+      }
+      #messages > li:nth-child(odd) {
+        background: #efefef;
+      }
+      .colormensajes {
+        color: rgb(199, 5, 99) !important;
+      }
+      /*fondo del mensaje*/
+      .highlighted-message {
+        background-color: #ffd700; /* Cambia este color al que desees */
+        font-weight: bold;
+      }
+      /* Estilo para el contenedor de mensajes */
+      .message-container {
+        padding-left: 10%;
+        padding-right: 10%;
+        padding-top: 20px;
+      }
+
+      /* Estilo para los mensajes del usuario */
+      .user-message {
+        align-self: flex-end; /* Alinear mensajes del usuario a la derecha */
+        background-color: #3498db;
+        color: #fff;
+        border-radius: 10px;
+        padding: 5px 10px;
+        margin: 5px;
+      }
+      /*p escriebiendo*/
+      p {
+        color: white;
+      }
+
+      /* Estilo para los mensajes del sistema */
+      .system-message {
+        align-self: flex-start; /* Alinear mensajes del sistema a la izquierda */
+        background-color: #ff0734;
+        color: #fff;
+        border-radius: 10px;
+        padding: 5px 10px;
+        margin: 5px;
+      }
+      header {
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* Centrar horizontalmente */
+        justify-content: center; /* Centrar verticalmente */
+        /* Ajusta el alto al 100% del viewport */
+      }
+      /*navbar*/
+      nav {
+        position: absolute;
+        top: 0;
+        width: 80%;
+        background-color: #453c417a !important;
+        border-radius: 5px;
+      }
+      .navbar-brand {
+        text-decoration: none;
+        color: rgb(250, 247, 247);
+        padding-left: 20%;
+        padding-right: 20%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <nav class="navbar bg-body-tertiary">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="#">
+            <img
+              src="https://i.pinimg.com/564x/66/a9/66/66a9669ae6284c6a3d789a30abc39cba.jpg"
+              alt="Logo"
+              width="40"
+              height="25"
+              class="d-inline-block align-text-top"
+            />
+            Las Chicas
+          </a>
+          <b><p id="escribiendo"></p></b>
+        </div>
+      </nav>
+    </header>
+    <div class="message-container">
+      <ul id="messages"></ul>
+
+      <form id="form" action="">
+        <input id="input" autocomplete="off" />
+        <button class="boton">enviar</button>
+      </form>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      var socket = io();
+
+      //Mostrar los mensajes 
+      const mostrarMensajes = (msg) => {
+        var item = document.createElement("li");
+        var mesajecolor = document.getElementById("messages");
+        item.textContent = msg.username + ": " + msg.text;
+        const messageColor = getRandomColor(msg.username); // Obtener el color basado en el nombre de usuario
+        item.style.backgroundColor = messageColor;
+        // Aplicar la clase CSS adecuada al mensaje según el tipo de mensaje
+        if (msg.username === "Sistema") {
+          item.classList.add("system-message");
+        } else {
+          item.classList.add("user-message");
+        }
+
+        mesajecolor.classList.add("colormensajes");
+        messages.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
+      };
+
+      var messages = document.getElementById("messages");
+      var form = document.getElementById("form");
+      var input = document.getElementById("input");
+      var userEscribiendo = document.getElementById("escribiendo");
+
+      // Solicita el nombre de usuario al conectarse
+      var username = prompt("Ingresa tu nombre de usuario:");
+      if (username) {
+        socket.username = username;
+        socket.emit(
+          "chat message",
+          username + " se ha unido al chat.",
+          "Sistema"
+        );
+      }
+
+      input.addEventListener("input", function () {
+        // Cuando el usuario comienza a escribir, emitir un evento "escribir" al servidor.
+        socket.emit("escribir", true, socket.username);
+
+        // Usar un temporizador para determinar cuándo el usuario ha dejado de escribir.
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(function () {
+          socket.emit("escribir", false, socket.username);
+        }, 1000); // Cambia este valor según tus preferencias.
+      });
+      socket.on("escribiendo", (users) => {
+        userEscribiendo.innerHTML = "";
+
+        for (const [username, isTyping] of Object.entries(users)) {
+          if (username !== socket.username && isTyping) {
+            const userTyping = document.createElement("span");
+            userTyping.textContent = username + " está escribiendo...";
+            userEscribiendo.appendChild(userTyping);
+          }
+        }
+      });
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        if (input.value) {
+          socket.emit("chat message", input.value, socket.username); //enviar el nombre de usuario
+          input.value = "";
+        }
+        //para que se muestren los mensajes
+        socket.on("chat message", function (msg) {
+          mostrarMensajes(msg);
+
+          if (msg.username === "NombreUsuarioEspecifico") {
+            const lastMessage = messages.lastChild;
+            lastMessage.classList.add("highlighted-message");
+          }
+        });
+      });
+
+      //funcion para generar color aleartoriamente segun el usuario
+      function getRandomColor(username) {
+        const colors = [
+          "#453c417a",
+          "#f8ffb8",
+          "#e4fff9",
+          "#D099E7",
+          "#5396D8",
+        ];
+        const index = username.charCodeAt(0) % colors.length;
+        return colors[index];
+      }
+    </script>
+  </body>
+</html>
